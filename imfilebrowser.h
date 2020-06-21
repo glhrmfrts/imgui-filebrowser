@@ -71,6 +71,9 @@ namespace ImGui
         // set the window title text
         void SetTitle(std::string title);
 
+        // set the flags
+        void SetFlags(ImGuiFileBrowserFlags flags);
+
         // open the browsing window
         void Open();
 
@@ -79,6 +82,8 @@ namespace ImGui
 
         // the browsing window is opened or not
         bool IsOpened() const noexcept;
+
+        bool HasRequestedCancel() const noexcept;
 
         // display the browsing window if opened
         void Display();
@@ -129,6 +134,7 @@ namespace ImGui
         bool closeFlag_;
         bool isOpened_;
         bool ok_;
+        bool requestedCancel_;
 
         std::string statusStr_;
 
@@ -162,7 +168,7 @@ namespace ImGui
 
 inline ImGui::FileBrowser::FileBrowser(ImGuiFileBrowserFlags flags)
     : width_(700), height_(450), flags_(flags),
-      openFlag_(false), closeFlag_(false), isOpened_(false), ok_(false),
+      openFlag_(false), closeFlag_(false), isOpened_(false), ok_(false), requestedCancel_(false),
       inputNameBuf_(std::make_unique<std::array<char, INPUT_NAME_BUF_SIZE>>())
 {
     if(flags_ & ImGuiFileBrowserFlags_CreateNewDir)
@@ -197,6 +203,7 @@ inline ImGui::FileBrowser &ImGui::FileBrowser::operator=(
     closeFlag_ = copyFrom.closeFlag_;
     isOpened_  = copyFrom.isOpened_;
     ok_        = copyFrom.ok_;
+    requestedCancel_ = copyFrom.requestedCancel_;
     
     statusStr_ = "";
     pwd_ = copyFrom.pwd_;
@@ -214,6 +221,14 @@ inline ImGui::FileBrowser &ImGui::FileBrowser::operator=(
     }
 
     return *this;
+}
+
+inline void ImGui::FileBrowser::SetFlags(ImGuiFileBrowserFlags flags)
+{
+    flags_ = flags;
+    if(flags_ & ImGuiFileBrowserFlags_CreateNewDir)
+        newDirNameBuf_ = std::make_unique<
+                                std::array<char, INPUT_NAME_BUF_SIZE>>();
 }
 
 inline void ImGui::FileBrowser::SetWindowSize(int width, int height) noexcept
@@ -238,6 +253,7 @@ inline void ImGui::FileBrowser::Open()
     statusStr_ = std::string();
     openFlag_ = true;
     closeFlag_ = false;
+    requestedCancel_ = false;
 }
 
 inline void ImGui::FileBrowser::Close()
@@ -246,6 +262,7 @@ inline void ImGui::FileBrowser::Close()
     statusStr_ = std::string();
     closeFlag_ = true;
     openFlag_ = false;
+    requestedCancel_ = false;
 }
 
 inline bool ImGui::FileBrowser::IsOpened() const noexcept
@@ -498,8 +515,11 @@ inline void ImGui::FileBrowser::Display()
     if(Button("cancel") || closeFlag_ ||
         ((flags_ & ImGuiFileBrowserFlags_CloseOnEsc) &&
          IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
-         escIdx >= 0 && IsKeyPressed(escIdx)))
+         escIdx >= 0 && IsKeyPressed(escIdx))) {
+
         CloseCurrentPopup();
+        requestedCancel_ = true;
+    }
 
     if(!statusStr_.empty() && !(flags_ & ImGuiFileBrowserFlags_NoStatusBar))
     {
@@ -520,6 +540,11 @@ inline void ImGui::FileBrowser::Display()
 inline bool ImGui::FileBrowser::HasSelected() const noexcept
 {
     return ok_;
+}
+
+inline bool ImGui::FileBrowser::HasRequestedCancel() const noexcept
+{
+	return requestedCancel_;
 }
 
 inline bool ImGui::FileBrowser::SetPwd(const std::filesystem::path &pwd)
